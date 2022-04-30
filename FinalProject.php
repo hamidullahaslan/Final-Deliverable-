@@ -6,9 +6,9 @@
 <h2>Watch for your entry in the Result!</h2>
 <?php
 $servername = "ecs-pd-proj-db.ecs.csus.edu";
-$username = "CSC174106";
-$password = "Csc134_120400539";
-$dbname = "CSC174106";
+$username = "CSC******";
+$password = "Csc134_******";
+$dbname = "CSC*****";
 
 // Create connection
 $conn = new mysqli($servername, $username, $password, $dbname);
