@@ -1,0 +1,104 @@
+CREATE TABLE USER_INFO (
+    user_id         INT NOT NULL,
+    name            varchar(50),
+    type            ENUM ('PAID_USER', 'FREE_USER') DEFAULT 'FREE_USER',
+    payment_method      varchar(20),
+    member_type         char(10),
+    ad_watch_time       INT,
+    PRIMARY KEY (user_id)
+);
+
+CREATE TABLE PLAY_LIST (
+    playlist_id        INT NOT NULL,
+    name               varchar(20),
+    userID             INT,
+    PRIMARY KEY(playlist_id),
+    FOREIGN KEY (userID) references USER_INFO (user_id)
+    );
+
+CREATE TABLE SONGS (
+    song_id         INT NOT NULL,
+    name            varchar(20),
+    genre           VARCHAR(10),
+    creation_date   DATE,
+    PRIMARY KEY (song_id)
+);
+
+CREATE TABLE PLAYLIST_SONG (
+    songID          INT,
+    playlistID      INT,
+    PRIMARY KEY (songID, playlistID),
+    FOREIGN KEY (songID) references SONGS (song_id),
+    FOREIGN KEY (playlistID) references PLAY_LIST (playlist_id)
+);
+
+CREATE TABLE USER_SONGS (
+    userID          INT,
+    songID          INT,
+    PRIMARY KEY (userID, songID),
+    FOREIGN KEY (userID) references USER_INFO (user_id),
+    FOREIGN KEY (songID) references SONGS (song_id)
+);
+
+CREATE VIEW FREE_USER AS SELECT user_id, name, ad_watch_time FROM  USER_INFO
+    WHERE type = 'FREE_USER';
+
+CREATE TABLE PAID_USER SELECT user_id, name, payment_method, member_type FROM USER_INFO
+    WHERE type = 'PAID_USER';
+
+DELIMITER $
+CREATE TRIGGER paidUser_INSERT
+    BEFORE INSERT ON USER_INFO
+    FOR EACH ROW
+    BEGIN
+        IF new.type = 'PAID_USER' THEN
+            INSERT INTO PAID_USER (user_id, name, payment_method, member_type)
+                VALUES (new.user_id, new.name, new.payment_method, new.member_type);
+        END IF;
+    END;
+
+CREATE TRIGGER paidUser_DELETE
+    BEFORE DELETE ON USER_INFO
+    FOR EACH ROW
+    BEGIN
+        IF old.type = 'PAID_USER' THEN
+            DELETE FROM PAID_USER WHERE user_id = old.user_id;
+        END IF;
+    END;
+
+CREATE TRIGGER paidUser_UPDATE
+    BEFORE UPDATE ON USER_INFO
+    FOR EACH ROW
+    BEGIN
+        IF new.type = 'PAID_USER' THEN
+            IF old.type <> 'PAID_USER' THEN
+                INSERT INTO PAID_USER (user_id, name, payment_method, member_type)
+                    VALUES (new.user_id, new.name, new.payment_method, new.member_type);
+            ELSE
+                IF old.user_id <> new.user_id THEN
+                    DELETE FROM PAID_USER WHERE user_id = old.user_id;
+                    INSERT INTO PAID_USER (user_id, name, payment_method, member_type)
+                        VALUES (new.user_id, new.name, new.payment_method, new.member_type);
+                ELSE
+                    UPDATE PAID_USER SET name = new.name, payment_method = new.payment_method, member_type = new.member_type
+                    WHERE user_id = new.user_id;
+                END IF;
+            END IF;
+        ELSEIF old.type = 'PAID_USER' THEN
+            DELETE FROM PAID_USER WHERE user_id = old.user_id;
+        END IF;
+    END;
+
+DELIMITER ;
+-- function take either 'FREE_USER' or 'PAID_USER' as an argument
+-- and return percentage of it in the table as an output.
+DELIMITER $
+CREATE FUNCTION percentageInTable (userType VARCHAR(15)) RETURNS INT
+BEGIN
+    DECLARE allUsers INT;
+    DECLARE subType INT;
+    SELECT COUNT(*) INTO allUsers FROM USER_INFO;
+    SELECT COUNT(*) INTO subType FROM USER_INFO WHERE type = userType;
+    RETURN (subType/allUsers) * 100;
+END;
+DELIMITER ;
